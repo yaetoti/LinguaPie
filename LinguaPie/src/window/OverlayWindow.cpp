@@ -39,8 +39,8 @@ bool OverlayWindow::Initialize() {
   // TODO must be fullscreen
   // TODO must be topmost (?)
 
-  int width = 1920;
-  int height = 1080;
+  int width = 800;
+  int height = 600;
 
   m_handle = CreateWindowExW(
     WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
@@ -248,18 +248,18 @@ bool OverlayWindow::Initialize() {
     auto* dc = DxContext::Get()->d3d11Context.Get();
     dc->OMSetRenderTargets(1, m_bufferViewMSAA.GetAddressOf(), nullptr);
 
-    // 0 0 0 0.3 - tint
-    // 0.03125 - darker
-    // 0.11328125 - lighter
-
     float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.3f };
     dc->ClearRenderTargetView(m_bufferViewMSAA.Get(), clearColor);
 
     ConstantBuffer<FrameData> buffer;
     buffer.data.resolution = DirectX::XMFLOAT2(static_cast<float>(width), static_cast<float>(height));
-    buffer.data.radius = std::min(buffer.data.resolution.x, buffer.data.resolution.y) * 0.324f;
     buffer.data.darkColor = ColorUtils::RgbFromHex(0x080808);
     buffer.data.brightColor = ColorUtils::RgbFromHex(0x1D1D1D);
+    buffer.data.radius = std::min(buffer.data.resolution.x, buffer.data.resolution.y) * 0.324f;
+    buffer.data.innerRadius = std::min(50.0f, 0.15f * buffer.data.radius);
+    buffer.data.msaaLevel = 4;
+    buffer.data.segments = 4;
+    buffer.data.activeSegment = 0;
     buffer.Init();
     dc->VSSetConstantBuffers(0, 1, buffer.GetAddressOf());
     dc->PSSetConstantBuffers(0, 1, buffer.GetAddressOf());

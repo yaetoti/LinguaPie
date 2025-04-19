@@ -4,10 +4,13 @@
 
 struct FrameData final {
   float radius;
-  DirectX::XMFLOAT2 resolution;
-  char _pad0[1];
+  float innerRadius;
+  int msaaLevel;
+  int segments;
+  int activeSegment;
   DirectX::XMFLOAT3 darkColor;
-  char _pad1[1];
   DirectX::XMFLOAT3 brightColor;
-  char _pad2[1];
+  char _pad0[1];
+  DirectX::XMFLOAT2 resolution;
+  char _pad1[2];
 };

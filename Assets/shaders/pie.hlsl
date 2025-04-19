@@ -3,9 +3,13 @@
 cbuffer FrameData : register(b0)
 {
   float g_radius;
-  float2 g_resolution;
+  float g_innerRadius;
+  int g_msaaLevel;
+  int g_segments;
+  int g_activeSegment;
   float3 g_darkColor;
   float3 g_brightColor;
+  float2 g_resolution;
 };
 
 // Vertex
@@ -70,30 +74,26 @@ float4 CalculateColor(double2 position) {
   double2 pixelVec = position - center;
   double distance = length(pixelVec);
 
-  float smallRadius = min(50, 0.15 * g_radius);
-
   // Out of bounds - discard
   if (distance > g_radius) {
     return float4(0.0, 0.0, 0.0, 0.0);
   }
 
   // Inner circle
-  if (distance < smallRadius) {
+  if (distance < g_innerRadius) {
     return float4(g_brightColor, 1.0);
   }
 
   // Calculate current segment
-  int segments = 9;
-  int segment = 2;
-  float segmentSize = 2 * PI / segments;
+  float segmentSize = 2 * PI / g_segments;
 
   float pixelAngle = atan2(pixelVec.y, pixelVec.x) + PI * 0.5;
   if (pixelAngle < 0.0f) {
     pixelAngle += 2.0f * PI;
   }
 
-  int pixelSegment = (int)(pixelAngle / segmentSize) % segments;
-  if (pixelSegment == segment) {
+  int pixelSegment = (int)(pixelAngle / segmentSize) % g_segments;
+  if (pixelSegment == g_activeSegment) {
     return float4(g_brightColor, 1.0);
   }
 
@@ -112,7 +112,7 @@ float4 CalculateColorMSAA(int2 position, int resolution) {
   double2 startPos = position + msaaOffset;
   float4 color = float4(0, 0, 0, 0);
 
-  // Mix alpha and color differently
+  // Mix alpha and color differently. Avoids color fading on the edges
   int samples = resolution * resolution;
   int opaqueSamples = 0;
 
@@ -131,11 +131,10 @@ float4 CalculateColorMSAA(int2 position, int resolution) {
 
   opaqueSamples = max(opaqueSamples, 1);
   return float4(color.rgb / opaqueSamples, color.a / samples);
-  //return float4(float3(opaqueSamples.xxx) / float3(samples.xxx), 1.0);
 }
 
 PSOutput PSMain(VSOutput input) {
   PSOutput output;
-  output.color = CalculateColorMSAA(input.position.xy, 4);
+  output.color = CalculateColorMSAA(input.position.xy, g_msaaLevel);
   return output;
 }
