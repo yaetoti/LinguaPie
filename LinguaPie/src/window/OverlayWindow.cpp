@@ -1,12 +1,18 @@
 #include "OverlayWindow.hpp"
 
 #include <cassert>
+#include <windowsx.h>
 #include <DirectXMath.h>
 #include <engine/Engine.hpp>
 #include <rendering/shaders/ShaderPipeline.hpp>
 #include <rendering/buffers/ConstantBuffer.hpp>
 #include <rendering/buffers/data/FrameData.hpp>
 
+#include "events/KeyWindowEvent.hpp"
+#include "events/MouseButtonWindowEvent.hpp"
+#include "events/MouseMoveWindowEvent.hpp"
+#include "events/MouseScrollWindowEvent.hpp"
+#include "events/ResizeWindowEvent.hpp"
 #include "utils/ColorUtils.hpp"
 
 OverlayWindow::OverlayWindow()
@@ -23,7 +29,7 @@ bool OverlayWindow::Initialize() {
   wc.cbClsExtra = 0;
   wc.cbWndExtra = 0;
   wc.style = CS_HREDRAW | CS_VREDRAW;
-  wc.lpfnWndProc = DefWindowProc;
+  wc.lpfnWndProc = WndProc;
   wc.hInstance = GetModuleHandleW(nullptr);
   wc.lpszClassName = kClassName;
   wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
@@ -58,6 +64,8 @@ bool OverlayWindow::Initialize() {
   if (!m_handle) {
     return false;
   }
+
+  InitHandlers();
 
   auto* dxgiFactory = DxContext::Get()->dxgiFactory.Get();
   auto* dcompDevice = DxContext::Get()->dcompDevice.Get();
@@ -276,6 +284,137 @@ int OverlayWindow::GetHeight() const {
   return m_height;
 }
 
+EventDispatcher<WindowEvent>& OverlayWindow::GetDispatcher() {
+  return m_dispatcher;
+}
+
 ID3D11RenderTargetView* OverlayWindow::GetRenderTargetViewMSAA() const {
   return m_bufferViewMSAA.Get();
+}
+
+bool OverlayWindow::HandleWindowMessage(UINT msg, WPARAM wParam, LPARAM lParam) const {
+  const auto& it = m_messageHandlers.find(msg);
+  if (it == m_messageHandlers.end()) {
+    return false;
+  }
+
+  it->second(msg, wParam, lParam);
+  return true;
+}
+
+void OverlayWindow::InitHandlers() {
+  m_messageHandlers[WM_SIZE] = [this](UINT msg, WPARAM wParam, LPARAM lParam) {
+    HandleResizeMessage(msg, wParam, lParam);
+  };
+
+  m_messageHandlers[WM_KEYDOWN]
+  = m_messageHandlers[WM_KEYUP]
+  = m_messageHandlers[WM_SYSKEYDOWN]
+  = m_messageHandlers[WM_SYSKEYUP]
+  = [this](UINT msg, WPARAM wParam, LPARAM lParam) {
+      HandleKeyMessage(msg, wParam, lParam);
+    };
+
+  m_messageHandlers[WM_LBUTTONDOWN]
+  = m_messageHandlers[WM_LBUTTONUP]
+  = m_messageHandlers[WM_RBUTTONDOWN]
+  = m_messageHandlers[WM_RBUTTONUP]
+  = m_messageHandlers[WM_MBUTTONDOWN]
+  = m_messageHandlers[WM_MBUTTONUP]
+  = m_messageHandlers[WM_XBUTTONDOWN]
+  = m_messageHandlers[WM_XBUTTONUP]
+  = [this](UINT msg, WPARAM wParam, LPARAM lParam) {
+      HandleMouseButtonMessage(msg, wParam, lParam);
+    };
+
+  m_messageHandlers[WM_MOUSEMOVE] = [this](UINT msg, WPARAM wParam, LPARAM lParam) {
+    HandleMouseMoveMessage(msg, wParam, lParam);
+  };
+
+  m_messageHandlers[WM_MOUSEWHEEL] = [this](UINT msg, WPARAM wParam, LPARAM lParam) {
+    HandleMouseScrollMessage(msg, wParam, lParam);
+  };
+}
+
+void OverlayWindow::HandleResizeMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
+  m_width = LOWORD(lParam);
+  m_height = HIWORD(lParam);
+  m_dispatcher.Dispatch(ResizeWindowEvent(m_width, m_height));
+}
+
+void OverlayWindow::HandleKeyMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
+  WORD vkCode = LOWORD(wParam);
+  WORD keyFlags = HIWORD(lParam);
+  BOOL wasPressed = (keyFlags & KF_REPEAT) == KF_REPEAT;
+  BOOL isReleased = (keyFlags & KF_UP) == KF_UP;
+  m_dispatcher.Dispatch(KeyWindowEvent(vkCode, !isReleased, wasPressed));
+}
+
+void OverlayWindow::HandleMouseButtonMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
+  float xCursor = static_cast<float>(GET_X_LPARAM(lParam));
+  float yCursor = static_cast<float>(GET_Y_LPARAM(lParam));
+  switch (msg) {
+    case WM_LBUTTONDOWN:
+      m_dispatcher.Dispatch(MouseButtonWindowEvent(MouseButton::LEFT, true, xCursor, yCursor));
+      return;
+    case WM_RBUTTONDOWN:
+      m_dispatcher.Dispatch(MouseButtonWindowEvent(MouseButton::RIGHT, true, xCursor, yCursor));
+      return;
+    case WM_MBUTTONDOWN:
+      m_dispatcher.Dispatch(MouseButtonWindowEvent(MouseButton::MIDDLE, true, xCursor, yCursor));
+      return;
+    case WM_XBUTTONDOWN: {
+      MouseButton xButtonType = HIWORD(wParam) == XBUTTON1 ? MouseButton::X1 : MouseButton::X2;
+      m_dispatcher.Dispatch(MouseButtonWindowEvent(xButtonType, true, xCursor, yCursor));
+      return;
+    }
+    case WM_LBUTTONUP:
+      m_dispatcher.Dispatch(MouseButtonWindowEvent(MouseButton::LEFT, false, xCursor, yCursor));
+      return;
+    case WM_RBUTTONUP:
+      m_dispatcher.Dispatch(MouseButtonWindowEvent(MouseButton::RIGHT, false, xCursor, yCursor));
+      return;
+    case WM_MBUTTONUP:
+      m_dispatcher.Dispatch(MouseButtonWindowEvent(MouseButton::MIDDLE, false, xCursor, yCursor));
+      return;
+    case WM_XBUTTONUP: {
+      MouseButton xButtonType = HIWORD(wParam) == XBUTTON1 ? MouseButton::X1 : MouseButton::X2;
+      m_dispatcher.Dispatch(MouseButtonWindowEvent(xButtonType, false, xCursor, yCursor));
+      return;
+    }
+    default:
+      break;
+  }
+}
+
+void OverlayWindow::HandleMouseMoveMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
+  float xCursor = static_cast<float>(GET_X_LPARAM(lParam));
+  float yCursor = static_cast<float>(GET_Y_LPARAM(lParam));
+  m_dispatcher.Dispatch(MouseMoveWindowEvent(xCursor, yCursor));
+}
+
+void OverlayWindow::HandleMouseScrollMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
+  float xCursor = static_cast<float>(GET_X_LPARAM(lParam));
+  float yCursor = static_cast<float>(GET_Y_LPARAM(lParam));
+  float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / WHEEL_DELTA;
+  m_dispatcher.Dispatch(MouseScrollWindowEvent(xCursor, yCursor, delta));
+}
+
+LRESULT OverlayWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+  if (msg == WM_CREATE) {
+    CREATESTRUCTW* data = reinterpret_cast<CREATESTRUCTW*>(lParam);
+    SetWindowLongPtrW(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(data->lpCreateParams));
+    return 0;
+  }
+
+  if (msg == WM_DESTROY) {
+    PostQuitMessage(0);
+    return 0;
+  }
+
+  OverlayWindow* window = reinterpret_cast<OverlayWindow*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+  if (window != nullptr && window->HandleWindowMessage(msg, wParam, lParam)) {
+    return 0;
+  }
+  return DefWindowProcW(hWnd, msg, wParam, lParam);
 }

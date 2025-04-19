@@ -18,7 +18,8 @@ file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.hpp")
 
 # Define executable
 add_executable(${PROJECT_NAME} WIN32 ${SOURCES}
-  src/utils/ColorUtils.hpp)
+  src/utils/ColorUtils.hpp
+  src/utils/EventDispatcher.hpp)
 set_target_properties(
   ${PROJECT_NAME} PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${BIN_DIR}/$<CONFIG>/${PROJECT_NAME}"

@@ -1,8 +1,12 @@
 #pragma once
 
+#include <functional>
+#include <unordered_map>
 #include <wrl/client.h>
 #include "engine/DxContext.hpp"
+#include "events/WindowEvent.hpp"
 #include "rendering/shaders/ShaderPipeline.hpp"
+#include "utils/EventDispatcher.hpp"
 
 struct OverlayWindow final {
   template<typename T>
@@ -15,15 +19,29 @@ struct OverlayWindow final {
   void Cleanup();
 
   void Present() const;
+  bool HandleWindowMessage(UINT msg, WPARAM wParam, LPARAM lParam) const;
 
   int GetWidth() const;
   int GetHeight() const;
+  EventDispatcher<WindowEvent>& GetDispatcher();
   ID3D11RenderTargetView* GetRenderTargetViewMSAA() const;
+
+private:
+  void InitHandlers();
+  void HandleResizeMessage(UINT msg, WPARAM wParam, LPARAM lParam);
+  void HandleKeyMessage(UINT msg, WPARAM wParam, LPARAM lParam);
+  void HandleMouseButtonMessage(UINT msg, WPARAM wParam, LPARAM lParam);
+  void HandleMouseMoveMessage(UINT msg, WPARAM wParam, LPARAM lParam);
+  void HandleMouseScrollMessage(UINT msg, WPARAM wParam, LPARAM lParam);
+
+  static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 private:
   HWND m_handle;
   int m_width;
   int m_height;
+  EventDispatcher<WindowEvent> m_dispatcher;
+  std::unordered_map<UINT, std::function<void(UINT, WPARAM, LPARAM)>> m_messageHandlers;
 
   ComPtr<IDXGISwapChain1> m_swapChain;
   ComPtr<ID3D11Texture2D> m_backBuffer;

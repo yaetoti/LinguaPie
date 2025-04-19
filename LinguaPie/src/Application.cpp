@@ -7,6 +7,8 @@
 #include "rendering/buffers/ConstantBuffer.hpp"
 #include "rendering/buffers/data/FrameData.hpp"
 #include "utils/ColorUtils.hpp"
+#include "window/events/KeyWindowEvent.hpp"
+#include "window/events/MouseMoveWindowEvent.hpp"
 
 Application::Application()
 : m_isRunning(true) {
@@ -18,6 +20,7 @@ Application::~Application() {
 }
 
 bool Application::Initialize() {
+  m_window->GetDispatcher().AddListener(this);
   if (!m_window->Initialize()) {
     return false;
   }
@@ -50,19 +53,45 @@ void Application::RunMainLoop() {
   }
 }
 
-void Application::Update() {
-  static int segment = 0;
-  static int timer = 0;
-
-  ++timer;
-  if (timer > 120) {
-    timer = 0;
-    ++segment;
-    if (segment >= 4) {
-      segment = 0;
+void Application::HandleEvent(const WindowEvent& e) {
+  if (e.type == WindowEventType::KEY) {
+    auto* event = e.As<KeyWindowEvent>();
+    if (event->vkCode == VK_ESCAPE) {
+      m_isRunning = false;
     }
+
+    return;
   }
 
+  if (e.type == WindowEventType::MOUSE_MOVE) {
+    auto* event = e.As<MouseMoveWindowEvent>();
+
+    std::wcout << L"Mouse moved:" << std::endl;
+    std::wcout << L"X: " << event->xCursor << std::endl;
+    std::wcout << L"Y: " << event->yCursor << std::endl;
+    std::wcout << std::endl;
+
+    // Calculate current segment
+
+    constexpr float PI = 3.14159265358976f;
+    float segmentSize = 2 * PI / m_segments;
+    float centerX = m_window->GetWidth() / 2;
+    float centerY = m_window->GetHeight() / 2;
+    float mouseVecX = event->xCursor - centerX;
+    float mouseVecY = event->yCursor - centerY;
+
+    float mouseAngle = atan2(mouseVecY, mouseVecX) + PI * 0.5;
+    if (mouseAngle < 0.0f) {
+      mouseAngle += 2.0f * PI;
+    }
+
+    m_mouseSegment = (int)(mouseAngle / segmentSize) % m_segments;
+
+    return;
+  }
+}
+
+void Application::Update() {
   // Set FrameData
   m_frameBuffer.data.resolution = DirectX::XMFLOAT2(
     static_cast<float>(m_window->GetWidth()),
@@ -73,8 +102,8 @@ void Application::Update() {
   m_frameBuffer.data.radius = std::min(m_frameBuffer.data.resolution.x, m_frameBuffer.data.resolution.y) * 0.324f;
   m_frameBuffer.data.innerRadius = std::min(50.0f, 0.15f * m_frameBuffer.data.radius);
   m_frameBuffer.data.msaaLevel = 4;
-  m_frameBuffer.data.segments = 4;
-  m_frameBuffer.data.activeSegment = segment;
+  m_frameBuffer.data.segments = m_segments;
+  m_frameBuffer.data.activeSegment = m_mouseSegment;
   m_frameBuffer.Init();
 }
 

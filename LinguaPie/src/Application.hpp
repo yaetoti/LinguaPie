@@ -5,7 +5,7 @@
 #include "rendering/buffers/ConstantBuffer.hpp"
 #include "rendering/buffers/data/FrameData.hpp"
 
-struct Application final {
+struct Application final : EventListener<WindowEvent> {
   Application();
   ~Application();
 
@@ -14,12 +14,16 @@ struct Application final {
 
   void RunMainLoop();
 
+  void HandleEvent(const WindowEvent& e) override;
+
 private:
   void Update();
   void Render() const;
 
 private:
   bool m_isRunning;
+  int m_segments = 5;
+  int m_mouseSegment = 0;
   std::shared_ptr<OverlayWindow> m_window;
   ConstantBuffer<FrameData> m_frameBuffer;
   ShaderPipeline m_menuPipeline;
