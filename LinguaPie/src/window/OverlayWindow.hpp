@@ -17,7 +17,12 @@ private:
   HWND m_handle;
   ComPtr<IDXGISwapChain1> m_swapChain;
   ComPtr<ID3D11Texture2D> m_backBuffer;
+  ComPtr<ID3D11Texture2D> m_backBufferMSAA;
   ComPtr<ID3D11RenderTargetView> m_bufferView;
+  ComPtr<ID3D11RenderTargetView> m_bufferViewMSAA;
+  ComPtr<ID3D11ShaderResourceView> m_bufferShaderViewMSAA;
+  ComPtr<ID3D11RasterizerState> m_rasterizerState;
+  ComPtr<ID3D11BlendState> m_blendState;
 
   ComPtr<IDCompositionTarget> m_compositionTarget;
   ComPtr<IDCompositionVisual> m_compositionVisual;

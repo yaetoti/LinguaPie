@@ -7,6 +7,8 @@
 #include <rendering/buffers/ConstantBuffer.hpp>
 #include <rendering/buffers/data/FrameData.hpp>
 
+#include "utils/ColorUtils.hpp"
+
 OverlayWindow::OverlayWindow()
 : m_handle(nullptr) {
 }
@@ -68,7 +70,7 @@ bool OverlayWindow::Initialize() {
     DXGI_SWAP_CHAIN_DESC1 desc = { };
     desc.Width = width;
     desc.Height = height;
-    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     desc.BufferCount = 2;
     desc.SampleDesc.Count = 1;
     desc.SampleDesc.Quality = 0;
@@ -109,6 +111,97 @@ bool OverlayWindow::Initialize() {
     if (FAILED(status)) {
       return false;
     }
+  }
+
+  // MSAA Back Buffer
+  {
+    D3D11_TEXTURE2D_DESC desc = { };
+    desc.ArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Width = width;
+    desc.Height = height;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    desc.SampleDesc.Count = 4;
+    desc.SampleDesc.Quality = 0;
+    status = device->CreateTexture2D(&desc, nullptr, m_backBufferMSAA.ReleaseAndGetAddressOf());
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+  }
+
+  // MSAA RenderTargetView
+  {
+    status = DxContext::Get()->d3d11Device->CreateRenderTargetView(
+      m_backBufferMSAA.Get(),
+      nullptr,
+      m_bufferViewMSAA.ReleaseAndGetAddressOf()
+    );
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+  }
+
+  // MSAA SRV
+  {
+    D3D11_SHADER_RESOURCE_VIEW_DESC desc { };
+    desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
+    desc.Texture2DMS = { };
+
+    status = DxContext::Get()->d3d11Device->CreateShaderResourceView(
+     m_backBufferMSAA.Get(),
+     &desc,
+     m_bufferShaderViewMSAA.ReleaseAndGetAddressOf()
+    );
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+  }
+
+  // Rasterizer State
+  {
+    D3D11_RASTERIZER_DESC desc = { };
+    desc.FillMode = D3D11_FILL_SOLID;
+    desc.CullMode = D3D11_CULL_BACK;
+    desc.FrontCounterClockwise = FALSE;
+    desc.DepthClipEnable = FALSE;
+    desc.ScissorEnable = FALSE;
+    desc.AntialiasedLineEnable = TRUE;
+    desc.MultisampleEnable = TRUE;
+
+    status = device->CreateRasterizerState(&desc, m_rasterizerState.ReleaseAndGetAddressOf());
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+
+    DxContext::Get()->d3d11Context->RSSetState(m_rasterizerState.Get());
+  }
+
+  // Blend State
+  {
+    D3D11_BLEND_DESC desc = { };
+    desc.RenderTarget[0].BlendEnable = TRUE;
+    desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+    desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+    desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_MAX;
+    desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+    status = device->CreateBlendState(&desc, m_blendState.ReleaseAndGetAddressOf());
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+
+    DxContext::Get()->d3d11Context->OMSetBlendState(m_blendState.Get(), nullptr, 0xFFFFFFFF);
   }
 
   // Composition
@@ -153,18 +246,20 @@ bool OverlayWindow::Initialize() {
 
   {
     auto* dc = DxContext::Get()->d3d11Context.Get();
-    dc->OMSetRenderTargets(1, m_bufferView.GetAddressOf(), nullptr);
+    dc->OMSetRenderTargets(1, m_bufferViewMSAA.GetAddressOf(), nullptr);
 
     // 0 0 0 0.3 - tint
     // 0.03125 - darker
     // 0.11328125 - lighter
 
     float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.3f };
-    dc->ClearRenderTargetView(m_bufferView.Get(), clearColor);
+    dc->ClearRenderTargetView(m_bufferViewMSAA.Get(), clearColor);
 
     ConstantBuffer<FrameData> buffer;
-    buffer.data.resolution.x = static_cast<float>(width);
-    buffer.data.resolution.y = static_cast<float>(height);
+    buffer.data.resolution = DirectX::XMFLOAT2(static_cast<float>(width), static_cast<float>(height));
+    buffer.data.radius = std::min(buffer.data.resolution.x, buffer.data.resolution.y) * 0.324f;
+    buffer.data.darkColor = ColorUtils::RgbFromHex(0x080808);
+    buffer.data.brightColor = ColorUtils::RgbFromHex(0x1D1D1D);
     buffer.Init();
     dc->VSSetConstantBuffers(0, 1, buffer.GetAddressOf());
     dc->PSSetConstantBuffers(0, 1, buffer.GetAddressOf());
@@ -175,7 +270,16 @@ bool OverlayWindow::Initialize() {
 
     dc->Draw(3, 0);
 
+    // MSAA blit
+    dc->OMSetRenderTargets(1, m_bufferView.GetAddressOf(), nullptr);
+    dc->PSSetShaderResources(0, 1, m_bufferShaderViewMSAA.GetAddressOf());
+    ShaderPipeline resolvePipeline;
+    resolvePipeline.Init(L"Assets/shaders/resolve.hlsl", ShaderType::VERTEX_SHADER | ShaderType::PIXEL_SHADER);
+    resolvePipeline.Bind();
 
+    dc->Draw(3, 0);
+
+    // Present
     m_swapChain->Present(1, 0);
   }
 
