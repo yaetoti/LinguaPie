@@ -8,7 +8,7 @@ m_isRunning(true) {
 }
 
 Application::~Application() {
-
+  Cleanup();
 }
 
 bool Application::Initialize() {
@@ -23,12 +23,8 @@ void Application::Cleanup() {
   m_window->Cleanup();
 }
 
-
 void Application::RunMainLoop() {
   // Main loop
-  OverlayWindow overlayWindow;
-  overlayWindow.Initialize();
-
   MSG msg;
   while (m_isRunning) {
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {

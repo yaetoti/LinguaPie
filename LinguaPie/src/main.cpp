@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <iostream>
 #include <ostream>
+#include <ConsoleLib/ConsoleLib/Console.hpp>
 #include <engine/Engine.hpp>
 
 extern "C" {
@@ -10,14 +11,17 @@ extern "C" {
 }
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow) {
-  Engine::SetWorkingDirectory(L"./");
+  Engine::SetWorkingDirectory(L"D:/Projects/WinAPI/LinguaPie/");
   Engine::Init();
 
   {
     std::unique_ptr<Application> application = std::make_unique<Application>();
-    application->RunMainLoop();
+    if (application->Initialize()) {
+      application->RunMainLoop();
+    }
   }
 
   Engine::Cleanup();
+  Console::Get()->Pause();
   return 0;
 }

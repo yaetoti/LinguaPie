@@ -2,6 +2,10 @@
 
 #include <cassert>
 #include <DirectXMath.h>
+#include <engine/Engine.hpp>
+#include <rendering/shaders/ShaderPipeline.hpp>
+#include <rendering/buffers/ConstantBuffer.hpp>
+#include <rendering/buffers/data/FrameData.hpp>
 
 OverlayWindow::OverlayWindow()
 : m_handle(nullptr) {
@@ -33,15 +37,18 @@ bool OverlayWindow::Initialize() {
   // TODO must be fullscreen
   // TODO must be topmost (?)
 
+  int width = 1920;
+  int height = 1080;
+
   m_handle = CreateWindowExW(
-    WS_EX_NOREDIRECTIONBITMAP,
+    WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
     kClassName,
     L"LinguaPie",
     WS_POPUP,
-    CW_USEDEFAULT,
-    CW_USEDEFAULT,
-    800,
-    600,
+    0,
+    0,
+    width,
+    height,
     nullptr,
     nullptr,
     GetModuleHandle(nullptr),
@@ -59,8 +66,8 @@ bool OverlayWindow::Initialize() {
   // SwapChain
   {
     DXGI_SWAP_CHAIN_DESC1 desc = { };
-    desc.Width = 800;
-    desc.Height = 600;
+    desc.Width = width;
+    desc.Height = height;
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     desc.BufferCount = 2;
     desc.SampleDesc.Count = 1;
@@ -127,9 +134,50 @@ bool OverlayWindow::Initialize() {
     dcompDevice->Commit();
   }
 
+  // Viewport
+  {
+    D3D11_VIEWPORT viewport = { };
+    viewport.Width = static_cast<float>(width);
+    viewport.Height = static_cast<float>(height);
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    viewport.TopLeftX = 0.0f;
+    viewport.TopLeftY = 0.0f;
+
+    DxContext::Get()->d3d11Context->RSSetViewports(1, &viewport);
+  }
+
   // TODO move elsewhere
   UpdateWindow(m_handle);
   ShowWindow(m_handle, SW_SHOW);
+
+  {
+    auto* dc = DxContext::Get()->d3d11Context.Get();
+    dc->OMSetRenderTargets(1, m_bufferView.GetAddressOf(), nullptr);
+
+    // 0 0 0 0.3 - tint
+    // 0.03125 - darker
+    // 0.11328125 - lighter
+
+    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.3f };
+    dc->ClearRenderTargetView(m_bufferView.Get(), clearColor);
+
+    ConstantBuffer<FrameData> buffer;
+    buffer.data.resolution.x = static_cast<float>(width);
+    buffer.data.resolution.y = static_cast<float>(height);
+    buffer.Init();
+    dc->VSSetConstantBuffers(0, 1, buffer.GetAddressOf());
+    dc->PSSetConstantBuffers(0, 1, buffer.GetAddressOf());
+
+    ShaderPipeline pipeline;
+    pipeline.Init(L"Assets/shaders/pie.hlsl", ShaderType::VERTEX_SHADER | ShaderType::PIXEL_SHADER);
+    pipeline.Bind();
+
+    dc->Draw(3, 0);
+
+
+    m_swapChain->Present(1, 0);
+  }
 
   return true;
 }
