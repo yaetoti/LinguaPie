@@ -37,10 +37,9 @@ bool OverlayWindow::Initialize() {
 
   // TODO must be created on a certain monitor
   // TODO must be fullscreen
-  // TODO must be topmost (?)
 
-  int width = 800;
-  int height = 600;
+  m_width = 1920;
+  m_height = 1080;
 
   m_handle = CreateWindowExW(
     WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
@@ -49,8 +48,8 @@ bool OverlayWindow::Initialize() {
     WS_POPUP,
     0,
     0,
-    width,
-    height,
+    m_width,
+    m_height,
     nullptr,
     nullptr,
     GetModuleHandle(nullptr),
@@ -68,8 +67,8 @@ bool OverlayWindow::Initialize() {
   // SwapChain
   {
     DXGI_SWAP_CHAIN_DESC1 desc = { };
-    desc.Width = width;
-    desc.Height = height;
+    desc.Width = m_width;
+    desc.Height = m_height;
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     desc.BufferCount = 2;
     desc.SampleDesc.Count = 1;
@@ -118,8 +117,8 @@ bool OverlayWindow::Initialize() {
     D3D11_TEXTURE2D_DESC desc = { };
     desc.ArraySize = 1;
     desc.MipLevels = 1;
-    desc.Width = width;
-    desc.Height = height;
+    desc.Width = m_width;
+    desc.Height = m_height;
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
@@ -230,8 +229,8 @@ bool OverlayWindow::Initialize() {
   // Viewport
   {
     D3D11_VIEWPORT viewport = { };
-    viewport.Width = static_cast<float>(width);
-    viewport.Height = static_cast<float>(height);
+    viewport.Width = static_cast<float>(m_width);
+    viewport.Height = static_cast<float>(m_height);
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     viewport.TopLeftX = 0.0f;
@@ -240,48 +239,13 @@ bool OverlayWindow::Initialize() {
     DxContext::Get()->d3d11Context->RSSetViewports(1, &viewport);
   }
 
+  // Shaders
+  m_resolvePipeline.Init(L"Assets/shaders/resolve.hlsl", ShaderType::VERTEX_SHADER | ShaderType::PIXEL_SHADER);
+
+  // Show
   // TODO move elsewhere
   UpdateWindow(m_handle);
   ShowWindow(m_handle, SW_SHOW);
-
-  {
-    auto* dc = DxContext::Get()->d3d11Context.Get();
-    dc->OMSetRenderTargets(1, m_bufferViewMSAA.GetAddressOf(), nullptr);
-
-    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.3f };
-    dc->ClearRenderTargetView(m_bufferViewMSAA.Get(), clearColor);
-
-    ConstantBuffer<FrameData> buffer;
-    buffer.data.resolution = DirectX::XMFLOAT2(static_cast<float>(width), static_cast<float>(height));
-    buffer.data.darkColor = ColorUtils::RgbFromHex(0x080808);
-    buffer.data.brightColor = ColorUtils::RgbFromHex(0x1D1D1D);
-    buffer.data.radius = std::min(buffer.data.resolution.x, buffer.data.resolution.y) * 0.324f;
-    buffer.data.innerRadius = std::min(50.0f, 0.15f * buffer.data.radius);
-    buffer.data.msaaLevel = 4;
-    buffer.data.segments = 4;
-    buffer.data.activeSegment = 0;
-    buffer.Init();
-    dc->VSSetConstantBuffers(0, 1, buffer.GetAddressOf());
-    dc->PSSetConstantBuffers(0, 1, buffer.GetAddressOf());
-
-    ShaderPipeline pipeline;
-    pipeline.Init(L"Assets/shaders/pie.hlsl", ShaderType::VERTEX_SHADER | ShaderType::PIXEL_SHADER);
-    pipeline.Bind();
-
-    dc->Draw(3, 0);
-
-    // MSAA blit
-    dc->OMSetRenderTargets(1, m_bufferView.GetAddressOf(), nullptr);
-    dc->PSSetShaderResources(0, 1, m_bufferShaderViewMSAA.GetAddressOf());
-    ShaderPipeline resolvePipeline;
-    resolvePipeline.Init(L"Assets/shaders/resolve.hlsl", ShaderType::VERTEX_SHADER | ShaderType::PIXEL_SHADER);
-    resolvePipeline.Bind();
-
-    dc->Draw(3, 0);
-
-    // Present
-    m_swapChain->Present(1, 0);
-  }
 
   return true;
 }
@@ -289,4 +253,29 @@ bool OverlayWindow::Initialize() {
 void OverlayWindow::Cleanup() {
   DestroyWindow(m_handle);
   UnregisterClassW(kClassName, GetModuleHandleW(nullptr));
+}
+
+void OverlayWindow::Present() const {
+  // MSAA blit
+  auto* dc = DxContext::Get()->d3d11Context.Get();
+  dc->OMSetRenderTargets(1, m_bufferView.GetAddressOf(), nullptr);
+  dc->PSSetShaderResources(0, 1, m_bufferShaderViewMSAA.GetAddressOf());
+  m_resolvePipeline.Bind();
+
+  dc->Draw(3, 0);
+
+  // Present
+  m_swapChain->Present(1, 0);
+}
+
+int OverlayWindow::GetWidth() const {
+  return m_width;
+}
+
+int OverlayWindow::GetHeight() const {
+  return m_height;
+}
+
+ID3D11RenderTargetView* OverlayWindow::GetRenderTargetViewMSAA() const {
+  return m_bufferViewMSAA.Get();
 }
