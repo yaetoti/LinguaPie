@@ -31,4 +31,10 @@ private:
   std::shared_ptr<OverlayWindow> m_window;
   ConstantBuffer<FrameData> m_frameBuffer;
   ShaderPipeline m_menuPipeline;
+
+  // Hooks
+  bool m_isWindowShown = false;
+  bool m_windowsPressed = false;
+  bool m_spacePressed = false;
+  POINT m_lastMousePos = POINT(0, 0);
 };

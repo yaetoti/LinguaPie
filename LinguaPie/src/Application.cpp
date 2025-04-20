@@ -93,28 +93,58 @@ void Application::HandleEvent(const WindowEvent& e) {
 
 LRESULT Application::HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam) {
   KBDLLHOOKSTRUCT* data = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
-  std::wcout << L"HandleKeyboardHook:" << std::endl;
+
   if (wParam == WM_KEYDOWN) {
-    std::wcout << L"Key down:" << std::endl;
+    if (data->vkCode == VK_LWIN || data->vkCode == VK_RWIN) {
+      m_windowsPressed = true;
+      return CallNextHookEx(nullptr, nCode, wParam, lParam);
+    }
+
+    if (data->vkCode == VK_SPACE && m_windowsPressed) {
+      // Handle overlay show
+      m_spacePressed = true;
+      GetCursorPos(&m_lastMousePos);
+      return -1;
+    }
   }
 
   if (wParam == WM_KEYUP) {
-    std::wcout << L"Key up:" << std::endl;
+    if (data->vkCode == VK_LWIN || data->vkCode == VK_RWIN) {
+      // Handle overlay hide
+      m_windowsPressed = false;
+      m_spacePressed = false;
+
+      return CallNextHookEx(nullptr, nCode, wParam, lParam);
+    }
+
+    if (data->vkCode == VK_SPACE) {
+      m_spacePressed = false;
+      // Handle overlay hide
+      return CallNextHookEx(nullptr, nCode, wParam, lParam);
+    }
   }
 
-  if (wParam == WM_SYSKEYDOWN) {
-    std::wcout << L"SysKey down:" << std::endl;
-  }
-
-  if (wParam == WM_SYSKEYUP) {
-    std::wcout << L"SysKey up:" << std::endl;
-  }
-
-  std::wcout << L"Key code: " << data->vkCode << std::endl;
-  return -1;
+  return CallNextHookEx(nullptr, nCode, wParam, lParam);
 }
 
 void Application::Update() {
+  if (!m_isWindowShown) {
+    if (m_windowsPressed && m_spacePressed) {
+      m_window->Show(SW_SHOW);
+      m_isWindowShown = true;
+    }
+  }
+  else {
+    if (!m_windowsPressed || !m_spacePressed) {
+      m_window->Show(SW_HIDE);
+      m_isWindowShown = false;
+    }
+  }
+
+  if (!m_isWindowShown) {
+    return;
+  }
+
   // Set FrameData
   m_frameBuffer.data.resolution = DirectX::XMFLOAT2(
     static_cast<float>(m_window->GetWidth()),

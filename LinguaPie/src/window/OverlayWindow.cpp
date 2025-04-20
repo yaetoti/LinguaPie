@@ -276,11 +276,6 @@ bool OverlayWindow::Initialize() {
   // Shaders
   m_resolvePipeline.Init(L"Assets/shaders/resolve.hlsl", ShaderType::VERTEX_SHADER | ShaderType::PIXEL_SHADER);
 
-  // Show
-  // TODO move elsewhere
-  UpdateWindow(m_handle);
-  ShowWindow(m_handle, SW_SHOW);
-
   return true;
 }
 
@@ -300,6 +295,11 @@ void OverlayWindow::Present() const {
 
   // Present
   m_swapChain->Present(1, 0);
+}
+
+void OverlayWindow::Show(int code) const {
+  ShowWindow(m_handle, code);
+  UpdateWindow(m_handle);
 }
 
 int OverlayWindow::GetWidth() const {

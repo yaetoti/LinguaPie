@@ -19,6 +19,7 @@ struct OverlayWindow final {
   void Cleanup();
 
   void Present() const;
+  void Show(int code) const;
   bool HandleWindowMessage(UINT msg, WPARAM wParam, LPARAM lParam) const;
 
   int GetWidth() const;
