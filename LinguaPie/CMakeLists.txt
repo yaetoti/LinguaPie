@@ -17,9 +17,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.hpp")
 
 # Define executable
-add_executable(${PROJECT_NAME} WIN32 ${SOURCES}
-  src/utils/ColorUtils.hpp
-  src/utils/EventDispatcher.hpp)
+add_executable(${PROJECT_NAME} WIN32 ${SOURCES})
 set_target_properties(
   ${PROJECT_NAME} PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${BIN_DIR}/$<CONFIG>/${PROJECT_NAME}"

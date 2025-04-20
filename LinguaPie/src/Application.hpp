@@ -18,6 +18,7 @@ struct Application final : EventListener<WindowEvent> {
   void RunMainLoop();
 
   void HandleEvent(const WindowEvent& e) override;
+  LRESULT HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam);
 
 private:
   void Update();

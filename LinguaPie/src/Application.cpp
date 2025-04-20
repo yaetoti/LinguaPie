@@ -91,6 +91,29 @@ void Application::HandleEvent(const WindowEvent& e) {
   }
 }
 
+LRESULT Application::HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam) {
+  KBDLLHOOKSTRUCT* data = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
+  std::wcout << L"HandleKeyboardHook:" << std::endl;
+  if (wParam == WM_KEYDOWN) {
+    std::wcout << L"Key down:" << std::endl;
+  }
+
+  if (wParam == WM_KEYUP) {
+    std::wcout << L"Key up:" << std::endl;
+  }
+
+  if (wParam == WM_SYSKEYDOWN) {
+    std::wcout << L"SysKey down:" << std::endl;
+  }
+
+  if (wParam == WM_SYSKEYUP) {
+    std::wcout << L"SysKey up:" << std::endl;
+  }
+
+  std::wcout << L"Key code: " << data->vkCode << std::endl;
+  return -1;
+}
+
 void Application::Update() {
   // Set FrameData
   m_frameBuffer.data.resolution = DirectX::XMFLOAT2(
