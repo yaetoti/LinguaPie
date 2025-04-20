@@ -256,6 +256,7 @@ void Application::Render() const {
   // Draw text
   dc2D->SetTarget(m_window->GetBackBuffer2D());
 
+  float textScale = m_radius / 350.0f;
   ComPtr<IDWriteTextFormat> textFormat;
   dwriteFactory->CreateTextFormat(
     L"Roboto",
@@ -263,7 +264,7 @@ void Application::Render() const {
     DWRITE_FONT_WEIGHT_MEDIUM,
     DWRITE_FONT_STYLE_NORMAL,
     DWRITE_FONT_STRETCH_NORMAL,
-    32,
+    32 * textScale,
     L"",
     textFormat.ReleaseAndGetAddressOf()
   );
@@ -274,13 +275,6 @@ void Application::Render() const {
   dc2D->BeginDraw();
   //dc2D->DrawLine(D2D1::Point2F(0, 0), D2D1::Point2F(1920, 1080), brush.Get(), 4);
 
-  // std::wstring text[] = {
-  //   L"EN (US)",
-  //   L"UA",
-  //   L"EN (INTL)",
-  //   L"RU",
-  // };
-
 
   std::wstring text[] = {
     L"RU",
@@ -288,40 +282,61 @@ void Application::Render() const {
     L"EN (INTL)",
     L"UA",
   };
-  D2D1_POINT_2F positions[4] = {
-    D2D1::Point2F(1100, 400),
-    D2D1::Point2F(1081, 656),
-    D2D1::Point2F(810, 690),
-    D2D1::Point2F(820, 369),
-  };
 
-  D2D1_POINT_2F centers[4];
 
-  DWRITE_TEXT_METRICS metrics[4];
-  ComPtr<IDWriteTextLayout> layouts[4];
 
-  for (int i = 0; i < 4; i++) {
+
+  constexpr float PI = 3.14159265358976f;
+  float segmentSize = 2 * PI / m_segments;
+  float centerX = m_window->GetWidth() / 2;
+  float centerY = m_window->GetHeight() / 2;
+  float labelRadius = m_innerRadius + (m_radius - m_innerRadius) * 0.5f;
+
+  std::vector<D2D1_POINT_2F> positions(m_segments);
+  std::vector<D2D1_POINT_2F> centers(m_segments);
+  std::vector<DWRITE_TEXT_METRICS> metrics(m_segments);
+  std::vector<ComPtr<IDWriteTextLayout>> layouts(m_segments);
+  std::vector<D2D1::Matrix3x2F> transforms(m_segments);
+
+  for (int i = 0; i < m_segments; i++) {
+    float angle = -segmentSize * (i + 0.5) + PI * 0.5f;
+    float rotationAngle = -angle;
+    if (rotationAngle > PI * 0.5f + 0.001f) {
+      rotationAngle -= PI;
+    }
+
+    if (rotationAngle < -PI * 0.5f - 0.001f) {
+      rotationAngle += PI;
+    }
+
+    positions[i] = D2D1::Point2F(
+      centerX + labelRadius * cosf(angle),
+      centerY - labelRadius * sinf(angle)
+    );
+
     dwriteFactory->CreateTextLayout(
       text[i].c_str(),
       text[i].length(),
       textFormat.Get(),
-      1000.0f,
-      1000.0f,
+      (m_radius - m_innerRadius) * 0.9f,
+      32.0f * textScale,
       layouts[i].ReleaseAndGetAddressOf()
     );
+
+    layouts[i]->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+    DWRITE_TRIMMING trimming = { DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0 };
+    ComPtr<IDWriteInlineObject> inlineObject;
+    dwriteFactory->CreateEllipsisTrimmingSign(textFormat.Get(), inlineObject.ReleaseAndGetAddressOf());
+    layouts[i]->SetTrimming(&trimming, inlineObject.Get());
 
     layouts[i]->GetMetrics(&metrics[i]);
 
     centers[i].x = positions[i].x - metrics[i].width / 2;
     centers[i].y = positions[i].y - metrics[i].height / 2;
+
+    transforms[i] = D2D1::Matrix3x2F::Rotation(rotationAngle * 180.0f / PI, positions[i]);
   }
 
-  D2D1::Matrix3x2F transforms[] = {
-    D2D1::Matrix3x2F::Rotation(-45, positions[0]),
-    D2D1::Matrix3x2F::Rotation(45, positions[1]),
-    D2D1::Matrix3x2F::Rotation(-45, positions[2]),
-    D2D1::Matrix3x2F::Rotation(45, positions[3]),
-  };
 
   for (int i = 0; i < 4; i++) {
     dc2D->SetTransform(transforms[i]);
@@ -329,7 +344,7 @@ void Application::Render() const {
       centers[i],
       layouts[i].Get(),
       brush.Get(),
-      D2D1_DRAW_TEXT_OPTIONS_NONE
+      D2D1_DRAW_TEXT_OPTIONS_CLIP
     );
   }
 
