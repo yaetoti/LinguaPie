@@ -22,7 +22,7 @@ private:
 
 private:
   bool m_isRunning;
-  int m_segments = 5;
+  int m_segments = 3;
   int m_mouseSegment = 0;
   std::shared_ptr<OverlayWindow> m_window;
   ConstantBuffer<FrameData> m_frameBuffer;

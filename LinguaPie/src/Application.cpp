@@ -101,7 +101,7 @@ void Application::Update() {
   m_frameBuffer.data.brightColor = ColorUtils::RgbFromHex(0x1D1D1D);
   m_frameBuffer.data.radius = std::min(m_frameBuffer.data.resolution.x, m_frameBuffer.data.resolution.y) * 0.324f;
   m_frameBuffer.data.innerRadius = std::min(50.0f, 0.15f * m_frameBuffer.data.radius);
-  m_frameBuffer.data.msaaLevel = 4;
+  m_frameBuffer.data.msaaLevel = 2;
   m_frameBuffer.data.segments = m_segments;
   m_frameBuffer.data.activeSegment = m_mouseSegment;
   m_frameBuffer.Init();
