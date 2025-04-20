@@ -4,7 +4,7 @@
 #include <ConsoleLib/ConsoleLib.hpp>
 
 void Engine::Init() {
-  Console::Get()->RedirectStdHandles();
+  //Console::Get()->RedirectStdHandles();
   DxContext::Get()->Initialize();
 }
 

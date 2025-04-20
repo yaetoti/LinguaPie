@@ -66,11 +66,6 @@ void Application::HandleEvent(const WindowEvent& e) {
   if (e.type == WindowEventType::MOUSE_MOVE) {
     auto* event = e.As<MouseMoveWindowEvent>();
 
-    std::wcout << L"Mouse moved:" << std::endl;
-    std::wcout << L"X: " << event->xCursor << std::endl;
-    std::wcout << L"Y: " << event->yCursor << std::endl;
-    std::wcout << std::endl;
-
     // Calculate current segment
 
     constexpr float PI = 3.14159265358976f;
@@ -79,6 +74,11 @@ void Application::HandleEvent(const WindowEvent& e) {
     float centerY = m_window->GetHeight() / 2;
     float mouseVecX = event->xCursor - centerX;
     float mouseVecY = event->yCursor - centerY;
+    float dist = sqrtf(mouseVecX * mouseVecX + mouseVecY * mouseVecY);
+    if (dist < m_innerRadius) {
+      m_selectedSegment = m_currentSegment;
+      return;
+    }
 
     float mouseAngle = atan2(mouseVecY, mouseVecX) + PI * 0.5;
     if (mouseAngle < 0.0f) {
@@ -129,16 +129,61 @@ LRESULT Application::HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam)
 void Application::Update() {
   if (!m_isWindowShown) {
     if (m_windowsPressed && m_spacePressed) {
-      // Show window
+      // Find display
       POINT cursorPos;
       GetCursorPos(&cursorPos);
       HMONITOR monitorHandle = MonitorFromPoint(cursorPos, MONITOR_DEFAULTTONEAREST);
 
+      // Get display rect
       MONITORINFO monitorInfo;
       monitorInfo.cbSize = sizeof(monitorInfo);
       GetMonitorInfoW(monitorHandle, &monitorInfo);
 
       RECT monitorRect = monitorInfo.rcMonitor;
+      int width = monitorRect.right - monitorRect.left;
+      int height = monitorRect.bottom - monitorRect.top;
+
+      // Recalculate values
+      m_frameBuffer.data.resolution = DirectX::XMFLOAT2(
+        static_cast<float>(width),
+        static_cast<float>(height)
+      );
+      m_radius = std::min(width, height) * 0.324f;
+      m_innerRadius = std::min(50.0f, 0.15f * m_radius);
+
+      // Load layouts
+      int layoutsCount = GetKeyboardLayoutList(0, nullptr);
+
+      m_layouts.resize(layoutsCount);
+      GetKeyboardLayoutList(layoutsCount, m_layouts.data());
+
+      std::wcout << L"Keyboard layouts:" << std::endl;
+      for (int i = 0; i < layoutsCount; i++) {
+        int layoutId = reinterpret_cast<uint32_t>(m_layouts.at(i)) & 0xFFFF;
+        int layoutSort = (reinterpret_cast<uint32_t>(m_layouts.at(i)) >> 16) & 0xFFFF;
+        std::wcout << std::hex << m_layouts.at(i) << " - " << layoutId << "-" << layoutSort << std::endl;
+      }
+
+      m_segments = layoutsCount;
+
+      // Get active layout
+      HWND hwnd = GetForegroundWindow();
+      DWORD threadId = GetWindowThreadProcessId(hwnd, nullptr);
+      HKL activeLayout = GetKeyboardLayout(threadId);
+
+      // Find its index in the list
+      int activeIndex = 0;
+      for (int i = 0; i < layoutsCount; i++) {
+        if (m_layouts[i] == activeLayout) {
+          activeIndex = i;
+          break;
+        }
+      }
+
+      m_currentSegment = activeIndex;
+
+      // Show window
+      SetCursorPos(monitorRect.left + width / 2, monitorRect.top + height / 2);
       SetWindowPos(
         m_window->GetHandle(),
         HWND_TOPMOST,
@@ -157,6 +202,8 @@ void Application::Update() {
       // Hide window
       m_window->Show(SW_HIDE);
       m_isWindowShown = false;
+
+      SendMessageW(GetForegroundWindow(), WM_INPUTLANGCHANGEREQUEST, 0, LPARAM(m_layouts.at(m_selectedSegment)));
     }
   }
 
@@ -171,8 +218,8 @@ void Application::Update() {
   );
   m_frameBuffer.data.darkColor = ColorUtils::RgbFromHex(0x080808);
   m_frameBuffer.data.brightColor = ColorUtils::RgbFromHex(0x1D1D1D);
-  m_frameBuffer.data.radius = std::min(m_frameBuffer.data.resolution.x, m_frameBuffer.data.resolution.y) * 0.324f;
-  m_frameBuffer.data.innerRadius = std::min(50.0f, 0.15f * m_frameBuffer.data.radius);
+  m_frameBuffer.data.radius = m_radius;
+  m_frameBuffer.data.innerRadius = m_innerRadius;
   m_frameBuffer.data.msaaLevel = 2;
   m_frameBuffer.data.segments = m_segments;
   m_frameBuffer.data.activeSegment = m_selectedSegment;
@@ -227,13 +274,20 @@ void Application::Render() const {
   dc2D->BeginDraw();
   //dc2D->DrawLine(D2D1::Point2F(0, 0), D2D1::Point2F(1920, 1080), brush.Get(), 4);
 
-  std::wstring text[] = {
-    L"EN (US)",
-    L"UA",
-    L"EN (INTL)",
-    L"RU",
-  };
+  // std::wstring text[] = {
+  //   L"EN (US)",
+  //   L"UA",
+  //   L"EN (INTL)",
+  //   L"RU",
+  // };
 
+
+  std::wstring text[] = {
+    L"RU",
+    L"EN (US)",
+    L"EN (INTL)",
+    L"UA",
+  };
   D2D1_POINT_2F positions[4] = {
     D2D1::Point2F(1100, 400),
     D2D1::Point2F(1081, 656),

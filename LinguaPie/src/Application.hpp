@@ -31,6 +31,9 @@ private:
   ShaderPipeline m_menuPipeline;
 
   // Only when window is shown
+  std::vector<HKL> m_layouts;
+  float m_radius = 10.0f;
+  float m_innerRadius = 1.0f;
   int m_segments = 4;
   int m_selectedSegment = 0;
   int m_currentSegment = 0;

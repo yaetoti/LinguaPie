@@ -23,7 +23,7 @@ struct WindowEvent {
 
   template <typename T>
   const T* As() const requires(std::derived_from<T, WindowEvent>) {
-    return reinterpret_cast<const T*>(this);
+    return dynamic_cast<const T*>(this);
   }
 
 protected:

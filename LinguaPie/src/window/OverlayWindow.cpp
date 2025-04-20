@@ -42,7 +42,7 @@ bool OverlayWindow::Initialize() {
   }
 
   m_handle = CreateWindowExW(
-    WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
+    WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
     kClassName,
     L"LinguaPie",
     WS_POPUP,
