@@ -41,12 +41,6 @@ bool OverlayWindow::Initialize() {
     return false;
   }
 
-  // TODO must be created on a certain monitor
-  // TODO must be fullscreen
-
-  m_width = 1920;
-  m_height = 1080;
-
   m_handle = CreateWindowExW(
     WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
     kClassName,
@@ -66,6 +60,90 @@ bool OverlayWindow::Initialize() {
   }
 
   InitHandlers();
+
+  auto* dxgiFactory = DxContext::Get()->dxgiFactory.Get();
+  auto* dcompDevice = DxContext::Get()->dcompDevice.Get();
+  auto* d2dContext = DxContext::Get()->d2d1Context.Get();
+  auto* device = DxContext::Get()->d3d11Device.Get();
+  HRESULT status = S_OK;
+
+  // Rasterizer State
+  {
+    D3D11_RASTERIZER_DESC desc = { };
+    desc.FillMode = D3D11_FILL_SOLID;
+    desc.CullMode = D3D11_CULL_BACK;
+    desc.FrontCounterClockwise = FALSE;
+    desc.DepthClipEnable = FALSE;
+    desc.ScissorEnable = FALSE;
+    desc.AntialiasedLineEnable = TRUE;
+    desc.MultisampleEnable = TRUE;
+
+    status = device->CreateRasterizerState(&desc, m_rasterizerState.ReleaseAndGetAddressOf());
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+
+    DxContext::Get()->d3d11Context->RSSetState(m_rasterizerState.Get());
+  }
+
+  // Blend State
+  {
+    D3D11_BLEND_DESC desc = { };
+    desc.RenderTarget[0].BlendEnable = TRUE;
+    desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+    desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+    desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_MAX;
+    desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+    status = device->CreateBlendState(&desc, m_blendState.ReleaseAndGetAddressOf());
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+
+    DxContext::Get()->d3d11Context->OMSetBlendState(m_blendState.Get(), nullptr, 0xFFFFFFFF);
+  }
+
+  // Composition
+  {
+    status = dcompDevice->CreateTargetForHwnd(
+      m_handle,
+      TRUE,
+      m_compositionTarget.ReleaseAndGetAddressOf()
+    );
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+
+    status = dcompDevice->CreateVisual(m_compositionVisual.ReleaseAndGetAddressOf());
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+  }
+
+  // Shaders
+  m_resolvePipeline.Init(L"Assets/shaders/resolve.hlsl", ShaderType::VERTEX_SHADER | ShaderType::PIXEL_SHADER);
+
+  return true;
+}
+
+void OverlayWindow::Cleanup() {
+  DestroyWindow(m_handle);
+  UnregisterClassW(kClassName, GetModuleHandleW(nullptr));
+
+  // TODO cleanup
+}
+
+bool OverlayWindow::CreateDeviceResources() {
+  if (m_width == 0 || m_height == 0) {
+    return false;
+  }
 
   auto* dxgiFactory = DxContext::Get()->dxgiFactory.Get();
   auto* dcompDevice = DxContext::Get()->dcompDevice.Get();
@@ -184,7 +262,7 @@ bool OverlayWindow::Initialize() {
       D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
       D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
     );
-    
+
     status = d2dContext->CreateBitmapFromDxgiSurface(
       surface.Get(),
       &props,
@@ -194,70 +272,6 @@ bool OverlayWindow::Initialize() {
     if (FAILED(status)) {
       return false;
     }
-  }
-
-  // Rasterizer State
-  {
-    D3D11_RASTERIZER_DESC desc = { };
-    desc.FillMode = D3D11_FILL_SOLID;
-    desc.CullMode = D3D11_CULL_BACK;
-    desc.FrontCounterClockwise = FALSE;
-    desc.DepthClipEnable = FALSE;
-    desc.ScissorEnable = FALSE;
-    desc.AntialiasedLineEnable = TRUE;
-    desc.MultisampleEnable = TRUE;
-
-    status = device->CreateRasterizerState(&desc, m_rasterizerState.ReleaseAndGetAddressOf());
-    assert(SUCCEEDED(status));
-    if (FAILED(status)) {
-      return false;
-    }
-
-    DxContext::Get()->d3d11Context->RSSetState(m_rasterizerState.Get());
-  }
-
-  // Blend State
-  {
-    D3D11_BLEND_DESC desc = { };
-    desc.RenderTarget[0].BlendEnable = TRUE;
-    desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_MAX;
-    desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
-    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-
-    status = device->CreateBlendState(&desc, m_blendState.ReleaseAndGetAddressOf());
-    assert(SUCCEEDED(status));
-    if (FAILED(status)) {
-      return false;
-    }
-
-    DxContext::Get()->d3d11Context->OMSetBlendState(m_blendState.Get(), nullptr, 0xFFFFFFFF);
-  }
-
-  // Composition
-  {
-    status = dcompDevice->CreateTargetForHwnd(
-      m_handle,
-      TRUE,
-      m_compositionTarget.ReleaseAndGetAddressOf()
-    );
-    assert(SUCCEEDED(status));
-    if (FAILED(status)) {
-      return false;
-    }
-
-    status = dcompDevice->CreateVisual(m_compositionVisual.ReleaseAndGetAddressOf());
-    assert(SUCCEEDED(status));
-    if (FAILED(status)) {
-      return false;
-    }
-
-    m_compositionVisual->SetContent(m_swapChain.Get());
-    m_compositionTarget->SetRoot(m_compositionVisual.Get());
-    dcompDevice->Commit();
   }
 
   // Viewport
@@ -273,15 +287,13 @@ bool OverlayWindow::Initialize() {
     DxContext::Get()->d3d11Context->RSSetViewports(1, &viewport);
   }
 
-  // Shaders
-  m_resolvePipeline.Init(L"Assets/shaders/resolve.hlsl", ShaderType::VERTEX_SHADER | ShaderType::PIXEL_SHADER);
-
+  m_compositionVisual->SetContent(m_swapChain.Get());
+  m_compositionTarget->SetRoot(m_compositionVisual.Get());
+  dcompDevice->Commit();
   return true;
 }
 
-void OverlayWindow::Cleanup() {
-  DestroyWindow(m_handle);
-  UnregisterClassW(kClassName, GetModuleHandleW(nullptr));
+void OverlayWindow::CleanupDeviceResources() {
 }
 
 void OverlayWindow::Present() const {
@@ -332,6 +344,10 @@ bool OverlayWindow::HandleWindowMessage(UINT msg, WPARAM wParam, LPARAM lParam) 
   return true;
 }
 
+HWND OverlayWindow::GetHandle() const {
+  return m_handle;
+}
+
 void OverlayWindow::InitHandlers() {
   m_messageHandlers[WM_SIZE] = [this](UINT msg, WPARAM wParam, LPARAM lParam) {
     HandleResizeMessage(msg, wParam, lParam);
@@ -369,6 +385,9 @@ void OverlayWindow::InitHandlers() {
 void OverlayWindow::HandleResizeMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
   m_width = LOWORD(lParam);
   m_height = HIWORD(lParam);
+
+  CreateDeviceResources();
+
   m_dispatcher.Dispatch(ResizeWindowEvent(m_width, m_height));
 }
 

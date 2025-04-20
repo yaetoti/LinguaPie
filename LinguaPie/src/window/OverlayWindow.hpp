@@ -18,10 +18,14 @@ struct OverlayWindow final {
   bool Initialize();
   void Cleanup();
 
+  bool CreateDeviceResources();
+  void CleanupDeviceResources();
+
   void Present() const;
   void Show(int code) const;
   bool HandleWindowMessage(UINT msg, WPARAM wParam, LPARAM lParam) const;
 
+  HWND GetHandle() const;
   int GetWidth() const;
   int GetHeight() const;
   EventDispatcher<WindowEvent>& GetDispatcher();
@@ -40,8 +44,8 @@ private:
 
 private:
   HWND m_handle;
-  int m_width;
-  int m_height;
+  int m_width = 800;
+  int m_height = 600;
   EventDispatcher<WindowEvent> m_dispatcher;
   std::unordered_map<UINT, std::function<void(UINT, WPARAM, LPARAM)>> m_messageHandlers;
 

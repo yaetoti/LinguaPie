@@ -85,7 +85,7 @@ void Application::HandleEvent(const WindowEvent& e) {
       mouseAngle += 2.0f * PI;
     }
 
-    m_mouseSegment = (int)(mouseAngle / segmentSize) % m_segments;
+    m_selectedSegment = (int)(mouseAngle / segmentSize) % m_segments;
 
     return;
   }
@@ -103,7 +103,6 @@ LRESULT Application::HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam)
     if (data->vkCode == VK_SPACE && m_windowsPressed) {
       // Handle overlay show
       m_spacePressed = true;
-      GetCursorPos(&m_lastMousePos);
       return -1;
     }
   }
@@ -130,12 +129,32 @@ LRESULT Application::HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam)
 void Application::Update() {
   if (!m_isWindowShown) {
     if (m_windowsPressed && m_spacePressed) {
-      m_window->Show(SW_SHOW);
+      // Show window
+      POINT cursorPos;
+      GetCursorPos(&cursorPos);
+      HMONITOR monitorHandle = MonitorFromPoint(cursorPos, MONITOR_DEFAULTTONEAREST);
+
+      MONITORINFO monitorInfo;
+      monitorInfo.cbSize = sizeof(monitorInfo);
+      GetMonitorInfoW(monitorHandle, &monitorInfo);
+
+      RECT monitorRect = monitorInfo.rcMonitor;
+      SetWindowPos(
+        m_window->GetHandle(),
+        HWND_TOPMOST,
+        monitorRect.left,
+        monitorRect.top,
+        monitorRect.right - monitorRect.left,
+        monitorRect.bottom - monitorRect.top,
+        SWP_SHOWWINDOW
+      );
+
       m_isWindowShown = true;
     }
   }
   else {
     if (!m_windowsPressed || !m_spacePressed) {
+      // Hide window
       m_window->Show(SW_HIDE);
       m_isWindowShown = false;
     }
@@ -156,11 +175,15 @@ void Application::Update() {
   m_frameBuffer.data.innerRadius = std::min(50.0f, 0.15f * m_frameBuffer.data.radius);
   m_frameBuffer.data.msaaLevel = 2;
   m_frameBuffer.data.segments = m_segments;
-  m_frameBuffer.data.activeSegment = m_mouseSegment;
+  m_frameBuffer.data.activeSegment = m_selectedSegment;
   m_frameBuffer.Init();
 }
 
 void Application::Render() const {
+  if (!m_isWindowShown) {
+    return;
+  }
+
   auto* dc = DxContext::Get()->d3d11Context.Get();
   auto* dc2D = DxContext::Get()->d2d1Context.Get();
   auto* dwriteFactory = DxContext::Get()->dwriteFactory.Get();

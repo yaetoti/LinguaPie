@@ -26,15 +26,17 @@ private:
 
 private:
   bool m_isRunning;
-  int m_segments = 4;
-  int m_mouseSegment = 0;
   std::shared_ptr<OverlayWindow> m_window;
   ConstantBuffer<FrameData> m_frameBuffer;
   ShaderPipeline m_menuPipeline;
+
+  // Only when window is shown
+  int m_segments = 4;
+  int m_selectedSegment = 0;
+  int m_currentSegment = 0;
 
   // Hooks
   bool m_isWindowShown = false;
   bool m_windowsPressed = false;
   bool m_spacePressed = false;
-  POINT m_lastMousePos = POINT(0, 0);
 };
