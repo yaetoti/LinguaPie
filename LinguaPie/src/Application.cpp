@@ -157,13 +157,6 @@ void Application::Update() {
       m_layouts.resize(layoutsCount);
       GetKeyboardLayoutList(layoutsCount, m_layouts.data());
 
-      std::wcout << L"Keyboard layouts:" << std::endl;
-      for (int i = 0; i < layoutsCount; i++) {
-        int layoutId = reinterpret_cast<uint32_t>(m_layouts.at(i)) & 0xFFFF;
-        int layoutSort = (reinterpret_cast<uint32_t>(m_layouts.at(i)) >> 16) & 0xFFFF;
-        std::wcout << std::hex << m_layouts.at(i) << " - " << layoutId << "-" << layoutSort << std::endl;
-      }
-
       m_segments = layoutsCount;
 
       // Get active layout
@@ -276,12 +269,21 @@ void Application::Render() const {
   //dc2D->DrawLine(D2D1::Point2F(0, 0), D2D1::Point2F(1920, 1080), brush.Get(), 4);
 
 
-  std::wstring text[] = {
-    L"RU",
-    L"EN (US)",
-    L"EN (INTL)",
-    L"UA",
-  };
+  std::vector<std::wstring> text;
+  for (int i = 0; i < m_segments; i++) {
+    uint32_t layoutId = (reinterpret_cast<uint32_t>(m_layouts.at(i)) >> 16) & 0xFFFF;
+    if (m_layoutMap.contains(layoutId)) {
+      text.emplace_back(m_layoutMap.at(layoutId));
+    } else {
+      text.emplace_back(L"Unknown");
+    }
+  }
+  // std::wstring text[] = {
+  //   L"RU",
+  //   L"EN (US)",
+  //   L"EN (INTL)",
+  //   L"UA",
+  // };
 
 
 
