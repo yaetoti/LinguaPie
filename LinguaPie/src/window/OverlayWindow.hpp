@@ -25,6 +25,7 @@ struct OverlayWindow final {
   int GetHeight() const;
   EventDispatcher<WindowEvent>& GetDispatcher();
   ID3D11RenderTargetView* GetRenderTargetViewMSAA() const;
+  ID2D1Bitmap1* GetBackBuffer2D() const;
 
 private:
   void InitHandlers();
@@ -44,6 +45,8 @@ private:
   std::unordered_map<UINT, std::function<void(UINT, WPARAM, LPARAM)>> m_messageHandlers;
 
   ComPtr<IDXGISwapChain1> m_swapChain;
+  ComPtr<IDXGISurface> m_surface;
+
   ComPtr<ID3D11Texture2D> m_backBuffer;
   ComPtr<ID3D11Texture2D> m_backBufferMSAA;
   ComPtr<ID3D11RenderTargetView> m_bufferView;
@@ -54,6 +57,8 @@ private:
 
   ComPtr<IDCompositionTarget> m_compositionTarget;
   ComPtr<IDCompositionVisual> m_compositionVisual;
+
+  ComPtr<ID2D1Bitmap1> m_d2d1BackBuffer;
 
   ShaderPipeline m_resolvePipeline;
 

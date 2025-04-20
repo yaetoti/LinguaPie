@@ -69,6 +69,7 @@ bool OverlayWindow::Initialize() {
 
   auto* dxgiFactory = DxContext::Get()->dxgiFactory.Get();
   auto* dcompDevice = DxContext::Get()->dcompDevice.Get();
+  auto* d2dContext = DxContext::Get()->d2d1Context.Get();
   auto* device = DxContext::Get()->d3d11Device.Get();
   HRESULT status = S_OK;
 
@@ -130,7 +131,7 @@ bool OverlayWindow::Initialize() {
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-    desc.SampleDesc.Count = 4;
+    desc.SampleDesc.Count = 1;
     desc.SampleDesc.Quality = 0;
     status = device->CreateTexture2D(&desc, nullptr, m_backBufferMSAA.ReleaseAndGetAddressOf());
     assert(SUCCEEDED(status));
@@ -163,6 +164,31 @@ bool OverlayWindow::Initialize() {
      m_backBufferMSAA.Get(),
      &desc,
      m_bufferShaderViewMSAA.ReleaseAndGetAddressOf()
+    );
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+  }
+
+  // D2D1 back buffer
+  {
+    ComPtr<IDXGISurface> surface;
+    status = m_backBufferMSAA.As(&surface);
+    assert(SUCCEEDED(status));
+    if (FAILED(status)) {
+      return false;
+    }
+
+    D2D1_BITMAP_PROPERTIES1 props = D2D1::BitmapProperties1(
+      D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+    );
+    
+    status = d2dContext->CreateBitmapFromDxgiSurface(
+      surface.Get(),
+      &props,
+      m_d2d1BackBuffer.ReleaseAndGetAddressOf()
     );
     assert(SUCCEEDED(status));
     if (FAILED(status)) {
@@ -290,6 +316,10 @@ EventDispatcher<WindowEvent>& OverlayWindow::GetDispatcher() {
 
 ID3D11RenderTargetView* OverlayWindow::GetRenderTargetViewMSAA() const {
   return m_bufferViewMSAA.Get();
+}
+
+ID2D1Bitmap1* OverlayWindow::GetBackBuffer2D() const {
+  return m_d2d1BackBuffer.Get();
 }
 
 bool OverlayWindow::HandleWindowMessage(UINT msg, WPARAM wParam, LPARAM lParam) const {

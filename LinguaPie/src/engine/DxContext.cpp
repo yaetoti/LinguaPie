@@ -84,6 +84,30 @@ bool DxContext::Initialize() {
     return false;
   }
 
+  // D2D1 Factory
+  status = D2D1CreateFactory(
+    D2D1_FACTORY_TYPE_SINGLE_THREADED,
+    IID_PPV_ARGS(d2d1Factory.ReleaseAndGetAddressOf())
+  );
+  assert(SUCCEEDED(status));
+  if (FAILED(status)) {
+    return false;
+  }
+
+  // D2D1 Device
+  status = d2d1Factory->CreateDevice(dxgiDevice.Get(), d2d1Device.ReleaseAndGetAddressOf());
+  assert(SUCCEEDED(status));
+  if (FAILED(status)) {
+    return false;
+  }
+
+  // D2D1 Context
+  status = d2d1Device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, d2d1Context.ReleaseAndGetAddressOf());
+  assert(SUCCEEDED(status));
+  if (FAILED(status)) {
+    return false;
+  }
+
   return true;
 }
 

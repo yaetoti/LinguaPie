@@ -109,6 +109,8 @@ void Application::Update() {
 
 void Application::Render() const {
   auto* dc = DxContext::Get()->d3d11Context.Get();
+  auto* dc2D = DxContext::Get()->d2d1Context.Get();
+  auto* dwriteFactory = DxContext::Get()->dwriteFactory.Get();
 
   // Set RT
   ID3D11RenderTargetView* views[] = {
@@ -127,6 +129,82 @@ void Application::Render() const {
 
   // Draw menu
   dc->Draw(3, 0);
+
+  // Draw text
+  dc2D->SetTarget(m_window->GetBackBuffer2D());
+
+  ComPtr<IDWriteTextFormat> textFormat;
+  dwriteFactory->CreateTextFormat(
+    L"Roboto",
+    nullptr,
+    DWRITE_FONT_WEIGHT_MEDIUM,
+    DWRITE_FONT_STYLE_NORMAL,
+    DWRITE_FONT_STRETCH_NORMAL,
+    32,
+    L"",
+    textFormat.ReleaseAndGetAddressOf()
+  );
+
+  ComPtr<ID2D1SolidColorBrush> brush;
+  dc2D->CreateSolidColorBrush(D2D1::ColorF(1.0f, 1.0f, 1.0f), brush.ReleaseAndGetAddressOf());
+
+  dc2D->BeginDraw();
+  //dc2D->DrawLine(D2D1::Point2F(0, 0), D2D1::Point2F(1920, 1080), brush.Get(), 4);
+
+  std::wstring text[] = {
+    L"EN (US)",
+    L"UA",
+    L"EN (INTL)",
+    L"RU",
+  };
+
+  D2D1_POINT_2F positions[4] = {
+    D2D1::Point2F(1100, 400),
+    D2D1::Point2F(1081, 656),
+    D2D1::Point2F(810, 690),
+    D2D1::Point2F(820, 369),
+  };
+
+  D2D1_POINT_2F centers[4];
+
+  DWRITE_TEXT_METRICS metrics[4];
+  ComPtr<IDWriteTextLayout> layouts[4];
+
+  for (int i = 0; i < 4; i++) {
+    dwriteFactory->CreateTextLayout(
+      text[i].c_str(),
+      text[i].length(),
+      textFormat.Get(),
+      1000.0f,
+      1000.0f,
+      layouts[i].ReleaseAndGetAddressOf()
+    );
+
+    layouts[i]->GetMetrics(&metrics[i]);
+
+    centers[i].x = positions[i].x - metrics[i].width / 2;
+    centers[i].y = positions[i].y - metrics[i].height / 2;
+  }
+
+  D2D1::Matrix3x2F transforms[] = {
+    D2D1::Matrix3x2F::Rotation(-45, positions[0]),
+    D2D1::Matrix3x2F::Rotation(45, positions[1]),
+    D2D1::Matrix3x2F::Rotation(-45, positions[2]),
+    D2D1::Matrix3x2F::Rotation(45, positions[3]),
+  };
+
+  for (int i = 0; i < 4; i++) {
+    dc2D->SetTransform(transforms[i]);
+    dc2D->DrawTextLayout(
+      centers[i],
+      layouts[i].Get(),
+      brush.Get(),
+      D2D1_DRAW_TEXT_OPTIONS_NONE
+    );
+  }
+
+
+  dc2D->EndDraw();
 
   // Blit
   m_window->Present();

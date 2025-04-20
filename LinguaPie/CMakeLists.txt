@@ -32,6 +32,7 @@ target_link_libraries(
   ConsoleLib
   dxgi
   d3d11
+  d2d1
   dcomp
   dwrite
   d3dcompiler

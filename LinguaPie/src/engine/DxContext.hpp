@@ -51,17 +51,8 @@ public:
   // DirectWrite
   ComPtr<IDWriteFactory> dwriteFactory;
 
-  ComPtr<IDXGISwapChain> swapChain;
-  ComPtr<ID3D11RenderTargetView> renderTargetView;
-  ComPtr<ID3D11DepthStencilView> depthStencilView;
-  ComPtr<ID3D11VertexShader> vertexShader;
-  ComPtr<ID3D11PixelShader> pixelShader;
-  ComPtr<ID3D11InputLayout> inputLayout;
-  ComPtr<ID3D11Buffer> vertexBuffer;
-  ComPtr<ID3D11Buffer> indexBuffer;
-  ComPtr<ID3D11Buffer> constantBuffer;
-  ComPtr<ID3D11SamplerState> sampler;
-  ComPtr<ID3D11RasterizerState> rasterizer;
-  ComPtr<ID3D11BlendState> blend;
-  ComPtr<ID3D11DepthStencilState> depthStencil;
+  // D2D1
+  ComPtr<ID2D1Factory1> d2d1Factory;
+  ComPtr<ID2D1Device> d2d1Device;
+  ComPtr<ID2D1DeviceContext> d2d1Context;
 };
