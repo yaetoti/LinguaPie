@@ -3,6 +3,8 @@
 #include <DirectXMath.h>
 #include <iostream>
 #include <window/OverlayWindow.hpp>
+#include <chrono>
+#include <thread>
 
 #include "rendering/buffers/ConstantBuffer.hpp"
 #include "rendering/buffers/data/FrameData.hpp"
@@ -37,7 +39,12 @@ void Application::Cleanup() {
 void Application::RunMainLoop() {
   // Main loop
   MSG msg;
+  constexpr double TARGET_FPS = 144.0;
+  constexpr std::chrono::duration<double> FRAME_TIME(1.0 / TARGET_FPS);
+
   while (m_isRunning) {
+    auto frameStart = std::chrono::high_resolution_clock::now();
+
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
       if (msg.message == WM_QUIT) {
         m_isRunning = false;
@@ -50,6 +57,12 @@ void Application::RunMainLoop() {
 
     Update();
     Render();
+
+    auto frameEnd = std::chrono::high_resolution_clock::now();
+    auto frameDuration = frameEnd - frameStart;
+    if (frameDuration < FRAME_TIME) {
+      std::this_thread::sleep_for(FRAME_TIME - frameDuration);
+    }
   }
 }
 
@@ -127,6 +140,13 @@ LRESULT Application::HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam)
 }
 
 void Application::Update() {
+  // Window needs a one-tick delay to process a language change request
+  if (m_isWindowClosing) {
+    m_window->Show(SW_HIDE);
+    m_isWindowShown = false;
+    m_isWindowClosing = false;
+  }
+
   if (!m_isWindowShown) {
     if (m_windowsPressed && m_spacePressed) {
       // Find display
@@ -161,6 +181,10 @@ void Application::Update() {
 
       // Get active layout
       HWND hwnd = GetForegroundWindow();
+      if (!hwnd) {
+        hwnd = GetDesktopWindow();
+      }
+
       DWORD threadId = GetWindowThreadProcessId(hwnd, nullptr);
       HKL activeLayout = GetKeyboardLayout(threadId);
 
@@ -186,17 +210,20 @@ void Application::Update() {
         monitorRect.bottom - monitorRect.top,
         SWP_SHOWWINDOW
       );
+      //SetForegroundWindow(m_window->GetHandle());
 
       m_isWindowShown = true;
     }
   }
   else {
     if (!m_windowsPressed || !m_spacePressed) {
-      // Hide window
-      m_window->Show(SW_HIDE);
-      m_isWindowShown = false;
-
+      // Hide a window
+      // Needs a one-tick timeout to handle a window message
       SendMessageW(GetForegroundWindow(), WM_INPUTLANGCHANGEREQUEST, 0, LPARAM(m_layouts.at(m_selectedSegment)));
+      //SendMessageW(m_window->GetHandle(), WM_INPUTLANGCHANGEREQUEST, 0, LPARAM(m_layouts.at(m_selectedSegment)));
+      m_isWindowClosing = true;
+
+
     }
   }
 

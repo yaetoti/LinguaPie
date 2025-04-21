@@ -13,7 +13,8 @@ extern "C" {
 }
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow) {
-  Engine::SetWorkingDirectory(L"");
+  Engine::SetWorkingDirectory(L"D:/Projects/WinAPI/LinguaPie/");
+  //Engine::SetWorkingDirectory(L"");
   Engine::Init();
 
   {
@@ -29,6 +30,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
   }
 
   Engine::Cleanup();
-  Console::Get()->Pause();
+  //Console::Get()->Pause();
   return 0;
 }

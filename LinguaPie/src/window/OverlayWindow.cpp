@@ -1,12 +1,14 @@
 #include "OverlayWindow.hpp"
 
 #include <cassert>
+#include <shellapi.h>
 #include <windowsx.h>
 #include <DirectXMath.h>
 #include <engine/Engine.hpp>
 #include <rendering/shaders/ShaderPipeline.hpp>
 #include <rendering/buffers/ConstantBuffer.hpp>
 #include <rendering/buffers/data/FrameData.hpp>
+#include <iostream>
 
 #include "events/KeyWindowEvent.hpp"
 #include "events/MouseButtonWindowEvent.hpp"
@@ -14,6 +16,7 @@
 #include "events/MouseScrollWindowEvent.hpp"
 #include "events/ResizeWindowEvent.hpp"
 #include "utils/ColorUtils.hpp"
+
 
 OverlayWindow::OverlayWindow()
 : m_handle(nullptr) {
@@ -58,6 +61,19 @@ bool OverlayWindow::Initialize() {
   if (!m_handle) {
     return false;
   }
+
+  // Setup tray icon
+  memset(&m_trayIcon, 0, sizeof(m_trayIcon));
+  m_trayIcon.cbSize = sizeof(m_trayIcon);
+  m_trayIcon.hWnd = m_handle;
+  m_trayIcon.uID = TRAY_ICON_ID;
+  m_trayIcon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+  m_trayIcon.uCallbackMessage = WM_TRAYICON;
+  m_trayIcon.hIcon = LoadIconW(nullptr, IDI_APPLICATION); // You can use your own icon here
+  wcscpy_s(m_trayIcon.szTip, L"LinguaPie"); // Tooltip text
+
+  Shell_NotifyIconW(NIM_ADD, &m_trayIcon);
+
 
   InitHandlers();
 
@@ -134,6 +150,8 @@ bool OverlayWindow::Initialize() {
 }
 
 void OverlayWindow::Cleanup() {
+  Shell_NotifyIconW(NIM_DELETE, &m_trayIcon);
+
   DestroyWindow(m_handle);
   UnregisterClassW(kClassName, GetModuleHandleW(nullptr));
 
@@ -380,6 +398,31 @@ void OverlayWindow::InitHandlers() {
   m_messageHandlers[WM_MOUSEWHEEL] = [this](UINT msg, WPARAM wParam, LPARAM lParam) {
     HandleMouseScrollMessage(msg, wParam, lParam);
   };
+
+  m_messageHandlers[WM_TRAYICON] = [this](UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (wParam == TRAY_ICON_ID) {
+      switch (LOWORD(lParam)) {
+        case WM_RBUTTONUP:
+        case WM_LBUTTONUP: {
+          POINT pt;
+          GetCursorPos(&pt);
+          HMENU hMenu = CreatePopupMenu();
+          AppendMenuW(hMenu, MF_STRING, 1, L"Exit");
+
+          SetForegroundWindow(m_handle);
+          int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY,
+                                 pt.x, pt.y, 0, m_handle, nullptr);
+          DestroyMenu(hMenu);
+
+          if (cmd == 1) {
+            DestroyWindow(m_handle);
+          }
+          break;
+        }
+        default: break;
+      }
+    }
+  };
 }
 
 void OverlayWindow::HandleResizeMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -459,6 +502,10 @@ LRESULT OverlayWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
   if (msg == WM_DESTROY) {
     PostQuitMessage(0);
     return 0;
+  }
+
+  if (msg == WM_INPUTLANGCHANGEREQUEST) {
+    return DefWindowProcW(hWnd, msg, wParam, lParam);
   }
 
   OverlayWindow* window = reinterpret_cast<OverlayWindow*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));

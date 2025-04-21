@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Windows.h>
+#include <shellapi.h>
 #include <functional>
 #include <unordered_map>
 #include <wrl/client.h>
@@ -48,6 +50,11 @@ private:
   int m_height = 600;
   EventDispatcher<WindowEvent> m_dispatcher;
   std::unordered_map<UINT, std::function<void(UINT, WPARAM, LPARAM)>> m_messageHandlers;
+
+  static constexpr UINT WM_TRAYICON = WM_USER + 1;
+  static constexpr UINT TRAY_ICON_ID = 1;
+  NOTIFYICONDATAW m_trayIcon;
+
 
   ComPtr<IDXGISwapChain1> m_swapChain;
   ComPtr<IDXGISurface> m_surface;
