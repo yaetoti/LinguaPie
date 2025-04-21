@@ -136,5 +136,6 @@ float4 CalculateColorMSAA(int2 position, int resolution) {
 PSOutput PSMain(VSOutput input) {
   PSOutput output;
   output.color = CalculateColorMSAA(input.position.xy, g_msaaLevel);
+  //output.color = float4(1.0, 1.0, 1.0, 1.0);
   return output;
 }

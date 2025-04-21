@@ -6,6 +6,10 @@ struct Application;
 struct KeyboardHookManager final {
   KeyboardHookManager();
   ~KeyboardHookManager();
+  KeyboardHookManager(const KeyboardHookManager&) = delete;
+  KeyboardHookManager& operator=(const KeyboardHookManager&) = delete;
+  KeyboardHookManager(KeyboardHookManager&&) = delete;
+  KeyboardHookManager& operator=(KeyboardHookManager&&) = delete;
 
   void SetApplication(Application* application);
   bool InstallHook();
@@ -15,11 +19,6 @@ struct KeyboardHookManager final {
   static void Destroy();
 
 private:
-  KeyboardHookManager(const KeyboardHookManager&) = delete;
-  KeyboardHookManager& operator=(const KeyboardHookManager&) = delete;
-  KeyboardHookManager(KeyboardHookManager&&) = delete;
-  KeyboardHookManager& operator=(KeyboardHookManager&&) = delete;
-
   LRESULT HandleEvent(int nCode, WPARAM wParam, LPARAM lParam);
   static LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 

@@ -18,6 +18,7 @@ void KeyboardHookManager::SetApplication(Application* application) {
 }
 
 bool KeyboardHookManager::InstallHook() {
+  UninstallHook();
   m_hook = SetWindowsHookExW(WH_KEYBOARD_LL, KeyboardProc, nullptr, 0);
   assert(m_hook != nullptr);
   return m_hook != nullptr;

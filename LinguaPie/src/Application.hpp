@@ -2,22 +2,24 @@
 #include <memory>
 #include <window/OverlayWindow.hpp>
 
+#include <hooks/events/LLMouseHookEvent.hpp>
 #include "rendering/buffers/ConstantBuffer.hpp"
 #include "rendering/buffers/data/FrameData.hpp"
 
-struct Application final : EventListener<WindowEvent> {
+struct Application final : EventListener<WindowEvent>, EventListener<LLMouseHookEvent> {
   template <typename T>
   using ComPtr = Microsoft::WRL::ComPtr<T>;
 
   Application();
-  ~Application();
+  ~Application() override;
 
   bool Initialize();
   void Cleanup();
 
   void RunMainLoop();
 
-  void HandleEvent(const WindowEvent& e) override;
+  void HandleEvent(const WindowEvent& e, CallbackInfo& info) override;
+  void HandleEvent(const LLMouseHookEvent& e, CallbackInfo& info) override;
   LRESULT HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam);
 
 private:
@@ -43,6 +45,8 @@ private:
   bool m_isWindowClosing = false;
   bool m_windowsPressed = false;
   bool m_spacePressed = false;
+
+  bool m_xMousePressed = false;
 
   inline static std::unordered_map<uint16_t, std::wstring> m_langMap = {
     { 0x0409, L"EN" },

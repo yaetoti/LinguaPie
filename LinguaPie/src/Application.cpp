@@ -42,9 +42,8 @@ void Application::RunMainLoop() {
   constexpr double TARGET_FPS = 144.0;
   constexpr std::chrono::duration<double> FRAME_TIME(1.0 / TARGET_FPS);
 
+  auto frameStart = std::chrono::high_resolution_clock::now();
   while (m_isRunning) {
-    auto frameStart = std::chrono::high_resolution_clock::now();
-
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
       if (msg.message == WM_QUIT) {
         m_isRunning = false;
@@ -55,18 +54,19 @@ void Application::RunMainLoop() {
       DispatchMessageW(&msg);
     }
 
-    Update();
-    Render();
-
     auto frameEnd = std::chrono::high_resolution_clock::now();
     auto frameDuration = frameEnd - frameStart;
-    if (frameDuration < FRAME_TIME) {
-      std::this_thread::sleep_for(FRAME_TIME - frameDuration);
+    if (frameDuration > FRAME_TIME) {
+      frameStart = frameEnd;
+
+      Update();
+      Render();
+      //std::this_thread::sleep_for(FRAME_TIME - frameDuration);
     }
   }
 }
 
-void Application::HandleEvent(const WindowEvent& e) {
+void Application::HandleEvent(const WindowEvent& e, CallbackInfo& info) {
   if (e.type == WindowEventType::KEY) {
     auto* event = e.As<KeyWindowEvent>();
     if (event->vkCode == VK_ESCAPE) {
@@ -116,7 +116,8 @@ LRESULT Application::HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam)
     if (data->vkCode == VK_SPACE && m_windowsPressed) {
       // Handle overlay show
       m_spacePressed = true;
-      return -1;
+      //return -1;
+      return CallNextHookEx(nullptr, nCode, wParam, lParam);
     }
   }
 
@@ -139,6 +140,27 @@ LRESULT Application::HandleKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam)
   return CallNextHookEx(nullptr, nCode, wParam, lParam);
 }
 
+void Application::HandleEvent(const LLMouseHookEvent &e, CallbackInfo &info) {
+  auto* data = reinterpret_cast<MSLLHOOKSTRUCT*>(e.lParam);
+  if (e.wParam == WM_XBUTTONDOWN && HIWORD(data->mouseData) == 1) {
+    m_xMousePressed = true;
+
+    e.SetReturnValue(-1);
+    info.Cancel();
+    PostMessageW(m_window->GetHandle(), WM_USER, 0, 0);
+    return;
+  }
+
+  if (e.wParam == WM_XBUTTONUP && HIWORD(data->mouseData) == 1) {
+    m_xMousePressed = false;
+
+    e.SetReturnValue(-1);
+    info.Cancel();
+    PostMessageW(m_window->GetHandle(), WM_USER, 0, 0);
+    return;
+  }
+}
+
 void Application::Update() {
   // Window needs a one-tick delay to process a language change request
   if (m_isWindowClosing) {
@@ -148,7 +170,7 @@ void Application::Update() {
   }
 
   if (!m_isWindowShown) {
-    if (m_windowsPressed && m_spacePressed) {
+    if (m_xMousePressed) {
       // Find display
       POINT cursorPos;
       GetCursorPos(&cursorPos);
@@ -216,14 +238,12 @@ void Application::Update() {
     }
   }
   else {
-    if (!m_windowsPressed || !m_spacePressed) {
+    if (!m_xMousePressed) {
       // Hide a window
       // Needs a one-tick timeout to handle a window message
       SendMessageW(GetForegroundWindow(), WM_INPUTLANGCHANGEREQUEST, 0, LPARAM(m_layouts.at(m_selectedSegment)));
       //SendMessageW(m_window->GetHandle(), WM_INPUTLANGCHANGEREQUEST, 0, LPARAM(m_layouts.at(m_selectedSegment)));
       m_isWindowClosing = true;
-
-
     }
   }
 
