@@ -325,6 +325,7 @@ void Application::Render() const {
       text.emplace_back(L"Unknown");
     }
   }
+
   // std::wstring text[] = {
   //   L"RU",
   //   L"EN (US)",
@@ -387,7 +388,7 @@ void Application::Render() const {
   }
 
 
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < m_segments; i++) {
     dc2D->SetTransform(transforms[i]);
     dc2D->DrawTextLayout(
       centers[i],
