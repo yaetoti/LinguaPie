@@ -17,6 +17,13 @@ A helpful tool I developed because pressing Win + Space thousands times was too 
 - Text alignment works poorly. No clipping, no font resizing
 - No public release for now because I'm being a lazy ass. So you have to build it manually
 
+**Stack**
+- C++
+- CMake
+- WinAPI
+- DirectX 11
+- DirectComposition
+
 ### Demo
 
 https://github.com/user-attachments/assets/46914e64-2a48-4ae8-b525-9408f9d70004
